@@ -281,6 +281,61 @@ fn draw_img(what: Vec<i32>) -> () {
     }
 }
 
+fn construct_tic(path: String, from: Vec<Chunk>) -> () {
+    println!("{}", path);
+
+    let mut file = fs::OpenOptions::new().create(true).write(true).open(path).expect("No");
+
+    for i in &from {
+        let type_id = match i.name.as_str() {
+            "Tiles" => 1,
+            "Sprites" => 2,
+            "Map" => 4,
+            "Code" => 5,
+            "Flags" => 6,
+            "Samples" => 9,
+            "Waveform" => 10,
+            "Palette" => 12,
+            "Music" => 14,
+            "Patterns" => 15,
+            "Default" => 17,
+            "Screen" => 18,
+            "Binary" => 19,
+            _ => 32,
+        } & 0b00011111 ;
+
+        println!("{}", type_id);
+
+        let size = i.data.len() as u16;
+
+        println!("{}", size);
+
+        let size_low : u8 = (size & 0b0000000011111111) as u8;
+        let size_high : u8 = ((size & 0b1111111100000000) >> 8) as u8;
+
+        println!("{} {}", size_low, size_high);
+
+        let bank = i.bank >> 5;
+
+        println!("{}", bank);
+
+        let mut chunk_bytes : Vec<u8> = vec![];
+
+        println!("{}", bank + type_id);
+
+        chunk_bytes.push(bank + type_id);
+        chunk_bytes.push(size_low);
+        chunk_bytes.push(size_high);
+        chunk_bytes.push(0);
+
+        for k in i.data.clone() {
+            chunk_bytes.push(k);
+        }
+
+        let _ = file.write_all(&chunk_bytes);
+    }
+}
+
 #[macroquad::main("ArTic Editor")]
 async fn main() {
 
@@ -790,9 +845,6 @@ async fn main() {
                 }
             },
             "saving" => {
-                println!("{}", file_path);
-
-                let mut file = fs::OpenOptions::new().create(true).write(true).open(file_path).expect("No");
 
                 let comp_tiles = compress(flatten(tiles.clone()));
                 let comp_sprites = compress(flatten(sprites.clone()));
@@ -802,54 +854,7 @@ async fn main() {
                 chunks = replace(chunks, Chunk { name : "Sprites".into(), bank : 0, data : comp_sprites});
                 chunks = replace(chunks, Chunk { name : "Palette".into(), bank : 0, data : exp_palette});
 
-                for i in &chunks {
-                    let type_id = match i.name.as_str() {
-                        "Tiles" => 1,
-                        "Sprites" => 2,
-                        "Map" => 4,
-                        "Code" => 5,
-                        "Flags" => 6,
-                        "Samples" => 9,
-                        "Waveform" => 10,
-                        "Palette" => 12,
-                        "Music" => 14,
-                        "Patterns" => 15,
-                        "Default" => 17,
-                        "Screen" => 18,
-                        "Binary" => 19,
-                        _ => 32,
-                    } & 0b00011111 ;
-
-                    println!("{}", type_id);
-
-                    let size = i.data.len() as u16;
-
-                    println!("{}", size);
-
-                    let size_low : u8 = (size & 0b0000000011111111) as u8;
-                    let size_high : u8 = ((size & 0b1111111100000000) >> 8) as u8;
-
-                    println!("{} {}", size_low, size_high);
-
-                    let bank = i.bank >> 5;
-
-                    println!("{}", bank);
-
-                    let mut chunk_bytes : Vec<u8> = vec![];
-
-                    println!("{}", bank + type_id);
-
-                    chunk_bytes.push(bank + type_id);
-                    chunk_bytes.push(size_low);
-                    chunk_bytes.push(size_high);
-                    chunk_bytes.push(0);
-
-                    for k in i.data.clone() {
-                        chunk_bytes.push(k);
-                    }
-
-                    let _ = file.write_all(&chunk_bytes);
-                }
+                construct_tic(file_path.into(), chunks);
 
                 current_state = "open";
 
